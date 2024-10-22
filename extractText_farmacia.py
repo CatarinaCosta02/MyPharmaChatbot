@@ -4,9 +4,9 @@ import os
 
 def perform_ocr_on_images(base_folder):
     image_sets = { # nº de paginas de cada
-        'condotril': 2,
-        'duobiotic': 1,
-        'neurofil': 2
+        'Condotril': 2,
+        'Duobiotic': 1,
+        'Neurofil': 2
     }
 
     for image_prefix, num_pages in image_sets.items():
