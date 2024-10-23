@@ -28,7 +28,8 @@ messages = chain.invoke(
         "input": "I love programming.",
     }
 )
-for chunk in llm.stream(messages):
-    print(chunk)
+
+# for chunk in llm.stream(messages):
+#     print(chunk)
 
 print(messages.content)
