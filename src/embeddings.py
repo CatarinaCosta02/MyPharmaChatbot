@@ -1,13 +1,13 @@
 from langchain_ollama import OllamaEmbeddings
 from langchain_text_splitters import CharacterTextSplitter
+from langchain_chroma import Chroma
 import os
-import re
-from tqdm import tqdm
+import chromadb
 
 
 def load_documents():
     documents_dir = "documents/"
-    target_folders = ["Condotril", "Duobiotic", "Neurofil"]
+    target_folders = ["Condotril", "Duobiotic", "Neurofil"] # se calhar arranjar forma de generalizar esta parte
     documents = []
     for folder in target_folders:
         folder_path = os.path.join(documents_dir, folder)
@@ -15,10 +15,9 @@ def load_documents():
         if os.path.exists(folder_path) and os.path.isdir(folder_path):
             for doc_name in os.listdir(folder_path):
                 if doc_name.endswith(".txt"):
-                    print(f"txt encontrado ({doc_name})!")
+                    # print(f"txt encontrado ({doc_name})!")
                     file_path = os.path.join(folder_path, doc_name)
-                    
-                    with open(file_path, "r", encoding="ISO-8859-1") as doc:
+                    with open(file_path, "r", encoding="utf-8") as doc:
                         content = doc.read()
                         documents.append(content)
     return documents
@@ -26,17 +25,6 @@ def load_documents():
 
 # Esta função tem que retornar os vetores para depois se fazer os embeddings
 def split_documents():
-    
-    
-    # index_dimension = 4096
-    # vectors_dictionary = {}
-    # vector = []
-    # vector_count = 0
-    # line_count = 0
-
-    embed = OllamaEmbeddings(
-        model="llama3.2:1b"
-    )
     
     text_splitter = CharacterTextSplitter(
         separator="\n\n",
@@ -46,133 +34,82 @@ def split_documents():
         is_separator_regex=False,
     )
 
-    all_documents_content = "\n\n".join(load_documents())
-    print(len(all_documents_content)) # caracteres
-    docs = text_splitter.create_documents([all_documents_content])
+    documents = "\n\n".join(load_documents())
+    print("Número de caracteres: ", len(documents))
+    docs = text_splitter.create_documents([documents])
 
-    print(len(docs)) # chunks
+    print("Número de chunks: ", len(docs))
     
-    print("Documentos 1\n", docs[0].page_content)
-    print("Documentos 2", docs[1].page_content)
-    print("Documentos 3", docs[2].page_content)
+    print("Documento 1\n", docs[0].page_content, "\n", "-"*80)
+    print("Documento 2\n", docs[1].page_content, "\n", "-"*80)
+    print("Documento 3\n", docs[2].page_content, "\n", "-"*80)
 
-    #content_Condotril = load_documents("documents/Condotril", "Condotril")
-    # content_Duobiotic = load_documents("documents/Condotril", "Condotril")
-    # content_Neurofil = load_documents("documents/Condotril", "Condotril")
-
-    #texts = text_splitter.create_documents([content_Condotril])
-
-    #print(texts[0].page_content)
+    return docs
 
 
-    # if medicamento=="Condotril":
-    #     for doc in Condotril_docs:
-    #         for line in doc.split('\n'):
-    #             line_count += 1
-    #             line = (str(line)).lower()
-    #             line = (re.sub(r'[^\w\s]', '', line)).strip()
-    #             vector.append(line)
-    #             if len(vector) >= index_dimension:
-    #                 vector_count += 1
-    #                 vectors_dictionary[vector_count] = vector
-    #                 vector = []
-    #         if vector:
-    #             vectors_dictionary[vector_count] = vector
+def get_ids(docs):
+    documents = [doc.page_content for doc in docs]
+    document_ids = [f"id{index}" for index, _ in enumerate(documents)]
+    
+    # for doc_id in document_ids:
+    #     print(doc_id)
 
-    # if medicamento=="Duobiotic":
-    #     for doc in Duobiotic_docs:
-    #         for line in doc.split('\n'):
-    #             line_count += 1
-    #             line = (str(line)).lower()
-    #             line = (re.sub(r'[^\w\s]', '', line)).strip()
-    #             vector.append(line)
-    #             if len(vector) >= index_dimension:
-    #                 vector_count += 1
-    #                 vectors_dictionary[vector_count] = vector
-    #                 vector = []
-    #         if vector:
-    #             vectors_dictionary[vector_count] = vector
+    return document_ids, docs
 
-    # if medicamento=="Neurofil":
-    #     for doc in Neurofil_docs:
-    #         for line in doc.split('\n'):
-    #             line_count += 1
-    #             line = (str(line)).lower()
-    #             line = (re.sub(r'[^\w\s]', '', line)).strip()
-    #             vector.append(line)
-    #             if len(vector) >= index_dimension:
-    #                 vector_count += 1
-    #                 vectors_dictionary[vector_count] = vector
-    #                 vector = []
-    #         if vector:
-    #             vectors_dictionary[vector_count] = vector
 
-    # print(f"{medicamento} splited!")
+
+def vector_storage(embed, document_ids, docs):
+    
+    persistent_client = chromadb.PersistentClient()
+    collection = persistent_client.get_or_create_collection("myPharma")
+
+    # AQUI
+    collection.add(ids=document_ids, documents=docs)
+
+    vector_store = Chroma(
+        client=persistent_client,
+        collection_name="myPharma",
+        embedding_function=embed,
+        persist_directory="./chroma_langchain_db"
+    )
+
+    vector_store.add_documents(documents=docs, ids=document_ids)
+
+    # return vector_store
+
+    # results = collection.query(
+    #     query_texts=["This is a query document about duobiotic"], # Chroma will embed this for you
+    #     n_results=1 # how many results to return
+    # )
+    # print(results)
+
+    results = vector_store.similarity_search(
+        "This is a query document about duobiotic",
+        k=1,
+        # filter={"source": "tweet"},
+    )
+    for res in results:
+        print(f"* {res.page_content} [{res.metadata}]")
+
 
 
 def main():
     
-    split_documents()
-    # documents_Condotril = []
-    # documents_Duobiotic = []
-    # documents_Neurofil = []
-
-    # documents_dir = "documents/"
-
-    # target_folders = ["Condotril", "Duobiotic", "Neurofil"]
-
-    # for folder in target_folders:
-    #     folder_path = os.path.join(documents_dir, folder)
-        
-    #     if os.path.exists(folder_path) and os.path.isdir(folder_path):
-    #         for doc_name in os.listdir(folder_path):
-    #             if doc_name.endswith(".txt"):
-    #                 file_path = os.path.join(folder_path, doc_name)
-                    
-    #                 with open(file_path, "r", encoding="ISO-8859-1") as doc:
-    #                     content = doc.read()
-                        
-    #                     if folder == "Condotril":
-    #                         documents_Condotril.append(content)
-    #                     elif folder == "Duobiotic":
-    #                         documents_Duobiotic.append(content)
-    #                     elif folder == "Neurofil":
-    #                         documents_Neurofil.append(content)
-
-    # print(f"Total de documentos em Condotril: {len(documents_Condotril)}")
-    # print(f"Total de documentos em Duobiotic: {len(documents_Duobiotic)}")
-    # print(f"Total de documentos em Neurofil: {len(documents_Neurofil)}")
-
-    # split_documents("Condotril", documents_Duobiotic, documents_Neurofil, documents_Neurofil)
-    # split_documents("Duobiotic", documents_Duobiotic, documents_Neurofil, documents_Neurofil)
-    # split_documents("Neurofil", documents_Duobiotic, documents_Neurofil, documents_Neurofil)
+    documents = split_documents()
+    embed = OllamaEmbeddings(model="llama3.2:1b")
+    document_ids, docs = get_ids(documents)
+    vector_storage(embed, document_ids, docs)
 
 
-    # for doc in documents_Condotril:
-    #     print(doc)
 
+    # result = collection.get()
+    # embeddings = result['embeddings']
+    # ids = result['ids']
+    # documents = result['documents']
 
-    # embed = OllamaEmbeddings(
-    #     model="llama3.2:1b"
-    #)
-    # ...
+    # vector_storage(embed, collection)
+    
 
-    # embedded_vectors = []
-    # for _, vector in tqdm(vectors_dictionary.items(), desc="Embedding Progress"):
-    #     # Embed the vector
-    #     embedded_vector = embed.embed_documents(vector)
-    #     print(f'embedded_vector: \n{embedded_vector}')
-    #     print(f'len(embedded_vector): \n{len(embedded_vector)}')
-
-    #     embedded_vectors.append(embedded_vector)
-
-    # print(f'\nlen(embedded_vectors): {len(embedded_vectors)}')
-
-    # print(f'len(embedded_vectors) : {len(embedded_vectors)}')
-    # for vec in embedded_vectors:
-    #     print(f'len(vec) : {len(vec)}\n')
-
-    # embedded_vectors = [item for sublist in embedded_vectors for item in sublist]
     
 
 if __name__ == "__main__":

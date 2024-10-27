@@ -3,7 +3,7 @@ from PIL import Image
 import os
 
 def perform_ocr_on_images(base_folder):
-    image_sets = { # nº de paginas de cada
+    image_sets = { # nº de paginas de cada, automatizar este processo (tem que contar o numero de imagens criadas)
         'Condotril': 2,
         'Duobiotic': 2,
         'Neurofil': 1

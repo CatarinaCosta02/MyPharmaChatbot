@@ -4,7 +4,7 @@ from pdf2image import convert_from_path
 def convert_pdf_to_images(base_folder):
     poppler_path = r"C:\Program Files\poppler-24.08.0\Library\bin" # têm que adicionar o poppler nas variáveis de sistema
     
-    subfolders = ['Condotril', 'Duobiotic', 'Neurofil']
+    subfolders = ['Condotril', 'Duobiotic', 'Neurofil'] # arranjar maneira de generalizar isto
 
     for subfolder in subfolders:
         folder_path = os.path.join(base_folder, subfolder)
