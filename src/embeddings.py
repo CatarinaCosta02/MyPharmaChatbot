@@ -48,7 +48,7 @@ def split_documents():
 
 
 def get_ids(docs):
-    documents = [doc.page_content for doc in docs]
+    documents = [doc.page_content if doc.page_content is not None else "" for doc in docs]
     document_ids = [f"id{index}" for index, _ in enumerate(documents)]
     
     # for doc_id in document_ids:
@@ -58,22 +58,29 @@ def get_ids(docs):
 
 
 
-def vector_storage(embed, document_ids, docs):
+def vector_storage(embed, document_ids, documents):
     
     persistent_client = chromadb.PersistentClient()
     collection = persistent_client.get_or_create_collection("myPharma")
 
+    # docs = [str(doc) if doc is not None else "" for doc in docs]
+
+# collection.add(ids=["1", "2", "3"], documents=["a", "b", "c"])
     # AQUI
+    docs = [doc.page_content if doc.page_content is not None else "" for doc in documents]
     collection.add(ids=document_ids, documents=docs)
 
     vector_store = Chroma(
-        client=persistent_client,
+        client=persistent_client, 
         collection_name="myPharma",
         embedding_function=embed,
-        persist_directory="./chroma_langchain_db"
+        persist_directory="./chroma_langchain_db" # vamos ter que alterar esta diretoria
     )
 
-    vector_store.add_documents(documents=docs, ids=document_ids)
+    vector_store.add_documents(documents=documents, ids=document_ids)
+
+
+    
 
     # return vector_store
 
@@ -108,6 +115,25 @@ def main():
     # documents = result['documents']
 
     # vector_storage(embed, collection)
+
+    # ZEEEEEEEEEEEEEEEEEE
+
+#     from langchain.embeddings import TruncateEmbedding
+
+#     truncate_embed = TruncateEmbedding(dim=384)
+
+# # Antes de adicionar aos documentos
+#     docs_truncated = [truncate_embed(doc) for doc in documents]
+
+#     vector_store.add_documents(documents=docs_truncated, ids=document_ids)
+
+#     results = vector_store.similarity_search(
+#         "This is a query document about duobiotic",
+#         k=1,
+#         embedding_dim=384  # Use a dimensão correspondente
+#     )
+
+
     
 
     
