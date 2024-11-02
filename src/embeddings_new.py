@@ -19,12 +19,11 @@ from langchain_elasticsearch import ElasticsearchRetriever
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
-from langchain_openai import ChatOpenAI
 
 
 def load_documents():
-    # documents_dir = "../documents/" # Catarina
-    documents_dir = "documents/"  # Marta
+    documents_dir = "../documents/" # Catarina
+    # documents_dir = "documents/"  # Marta
     target_folders = ["Condotril", "Duobiotic", "Neurofil"]  # nomes dos produtos
     documents = {folder: "" for folder in target_folders}  # Inicializa um dicionário para cada produto
 
@@ -229,36 +228,36 @@ def vector_query(search_query: str) -> Dict:
     }
 
 
-def hybrid_query(search_query: str) -> Dict:
-    dense_vector_field = "fake_embedding"
-    text_field = "text"
-    embeddings = OllamaEmbeddings(model="llama3.2:1b")
-    vector = embeddings.embed_query(search_query)  # same embeddings as for indexing
-    return {
-        "retriever": {
-            "rrf": {
-                "retrievers": [
-                    {
-                        "standard": {
-                            "query": {
-                                "match": {
-                                    text_field: search_query,
-                                }
-                            }
-                        }
-                    },
-                    {
-                        "knn": {
-                            "field": dense_vector_field,
-                            "query_vector": vector,
-                            "k": 5,
-                            "num_candidates": 10,
-                        }
-                    },
-                ]
-            }
-        }
-    }
+# def hybrid_query(search_query: str) -> Dict:
+#     dense_vector_field = "fake_embedding"
+#     text_field = "text"
+#     embeddings = OllamaEmbeddings(model="llama3.2:1b")
+#     vector = embeddings.embed_query(search_query)  # same embeddings as for indexing
+#     return {
+#         "retriever": {
+#             "rrf": {
+#                 "retrievers": [
+#                     {
+#                         "standard": {
+#                             "query": {
+#                                 "match": {
+#                                     text_field: search_query,
+#                                 }
+#                             }
+#                         }
+#                     },
+#                     {
+#                         "knn": {
+#                             "field": dense_vector_field,
+#                             "query_vector": vector,
+#                             "k": 5,
+#                             "num_candidates": 10,
+#                         }
+#                     },
+#                 ]
+#             }
+#         }
+#     }
 
 
 
@@ -289,7 +288,7 @@ def main():
         print("Falha na criação do índice.")
 
     # DESCOMENTAR A FUNÇAO QUE É PRETENDIDA !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    # vector_store.add_documents(documents=documents, ids=uuids) # comentar depois de adicionar a primeira vez para nao duplicar informação
+    vector_store.add_documents(documents=documents, ids=uuids) # comentar depois de adicionar a primeira vez para nao duplicar informação
     # vector_store._index.delete(delete_all=True) # apagar todos os documentos da base de dados
     print("Documentos armazenados com sucesso!")
     print("chegou aqui\n\n")
@@ -372,44 +371,60 @@ def main():
         url=es_endpoint,
         api_key=es_api_key
     )
+
     message = vector_retriever.invoke("condotril")
-    print("\n\nmessage:\n", message)
+
+    # print("\n\nmessage:\n", message)
+
+    for doc in message:
+        print(f"Texto: {doc.page_content}")
+        print(f"ID: {doc.metadata['_id']}")
+        print(f"Pontuação: {doc.metadata['_score']:.4f}")
+        print("-" * 50)  # Linha separadora
 
 
     
-    hybrid_retriever = ElasticsearchRetriever.from_es_params(
-        index_name=es_index_name,
-        body_func=hybrid_query,
-        content_field=text_field,
-        url=es_endpoint,
-        api_key=es_api_key
+    # hybrid_retriever = ElasticsearchRetriever.from_es_params(
+    #     index_name=es_index_name,
+    #     body_func=hybrid_query,
+    #     content_field=text_field,
+    #     url=es_endpoint,
+    #     api_key=es_api_key
+    # )
+    # message2 = hybrid_retriever.invoke("neurofil")
+    # print("\n\nHIBRID message:\n", message2)
+
+    def format_docs(docs):
+        return "\n\n".join(doc.page_content for doc in docs)
+
+    # Retrieve documents for testing
+    retrieved_docs = vector_store.similarity_search("Tell me something about Duobiotic", k=2)
+    for res in retrieved_docs:
+        print(f"* {res.page_content} [{res.metadata}]")
+
+    # Format the retrieved documents into a single string
+    formatted_context = format_docs(retrieved_docs)
+
+    # Use the formatted context in the prompt template
+    prompt = ChatPromptTemplate.from_template(
+        """Answer the question based only on the context provided.
+
+        Context: {context}
+
+        Question: {question}"""
     )
-    message2 = hybrid_retriever.invoke("neurofil")
-    print("\n\nHIBRID message:\n", message2)
 
+    # Pass the formatted_context and question to the prompt
+    formatted_prompt = prompt.invoke({"context": formatted_context, "question": "What are the organization's sales goals?"})
 
-    # # usar o retriever em chain
-    # prompt = ChatPromptTemplate.from_template(
-    #     """Answer the question based only on the context provided.
+    # Embed the prompt text using the embedding model
+    prompt_embedding = embed.embed_query(formatted_prompt)
 
-    #     Context: {context}
+    # Parse the embedding if necessary
+    parsed_output = StrOutputParser().parse(prompt_embedding)
+    
+    print("answer:", parsed_output)
 
-    #     Question: {question}"""
-    # )
-
-    # llm = ChatOpenAI(model="gpt-4o-mini") # podemos alterar este modelo
-
-    # def format_docs(docs):
-    #     return "\n\n".join(doc.page_content for doc in docs)
-
-    # chain = (
-    #     {"context": vector_retriever | format_docs, "question": RunnablePassthrough()}
-    #     | prompt
-    #     | llm
-    #     | StrOutputParser()
-    # )
-
-    # chain.invoke("Quais são os benefícios do Condotril?")
 
 
 
