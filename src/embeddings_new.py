@@ -1,5 +1,6 @@
 import os
 import getpass
+import sys
 import time
 import uuid
 import logging
@@ -155,20 +156,6 @@ def initialize_retriever():
     ]
 
 
-def vector_query(search_query: str) -> Dict:
-    dense_vector_field = "fake_embedding"
-
-    embeddings = OllamaEmbeddings(model="llama3.2:1b")
-
-    vector = embeddings.embed_query(search_query)  # same embeddings as for indexing
-    return {
-        "knn": {
-            "field": dense_vector_field,
-            "query_vector": vector,
-            "k": 5,
-            "num_candidates": 10,
-        }
-    }
 
 
 
@@ -197,11 +184,12 @@ def es_index_data(
     text_field: str,
     dense_vector_field: str,
     embeddings: Embeddings,
+    num_characters_field: str,
     texts: Iterable[str],
     refresh: bool = True,
 ) -> None:
     es_create_index(
-        es_client, index_name, text_field, dense_vector_field, num_characters_field # nao sei como resolver isto
+        es_client, index_name, text_field, dense_vector_field, num_characters_field
     )
 
     vectors = embeddings.embed_documents(list(texts))
@@ -222,12 +210,62 @@ def es_index_data(
     if refresh:
         es_client.indices.refresh(index=index_name)
 
+    print("Print importante:", len(requests))
+
     return len(requests)
+
+
+def vector_query(search_query: str) -> Dict:
+    dense_vector_field = "fake_embedding"
+    embeddings = OllamaEmbeddings(model="llama3.2:1b")
+    vector = embeddings.embed_query(search_query)  # same embeddings as for indexing
+    return {
+        "knn": {
+            "field": dense_vector_field,
+            "query_vector": vector,
+            "k": 5,
+            "num_candidates": 10,
+        }
+    }
+
+
+def hybrid_query(search_query: str) -> Dict:
+    dense_vector_field = "fake_embedding"
+    text_field = "text"
+    embeddings = OllamaEmbeddings(model="llama3.2:1b")
+    vector = embeddings.embed_query(search_query)  # same embeddings as for indexing
+    return {
+        "retriever": {
+            "rrf": {
+                "retrievers": [
+                    {
+                        "standard": {
+                            "query": {
+                                "match": {
+                                    text_field: search_query,
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "knn": {
+                            "field": dense_vector_field,
+                            "query_vector": vector,
+                            "k": 5,
+                            "num_candidates": 10,
+                        }
+                    },
+                ]
+            }
+        }
+    }
+
 
 
 
 
 def main():
+    
     documents = split_documents()
     embed = OllamaEmbeddings(model="llama3.2:1b")
 
@@ -285,78 +323,93 @@ def main():
     
     # RETRIEVER
 
-    # os.environ["LANGSMITH_API_KEY"] = getpass.getpass("Enter your LangSmith API key: ")
-    # os.environ["LANGSMITH_TRACING"] = "true"
-
-    es_endpoint = "https://324ecfa0ea11408f9c1d397bb89dad15.us-east-1.aws.found.io:443"
-    es_api_key = "MXExTDJwSUJpQ0tFUXJESU5HZTY6TWxWSXpsSHFReXFSS0ExczFZWm56Zw=="
     # es_url = "http://localhost:9200"
+    es_endpoint = "https://324ecfa0ea11408f9c1d397bb89dad15.us-east-1.aws.found.io:443" # Marta
+    es_api_key = "MXExTDJwSUJpQ0tFUXJESU5HZTY6TWxWSXpsSHFReXFSS0ExczFZWm56Zw=="
     # es_client = Elasticsearch(hosts=[es_url]) # local
     es_client = Elasticsearch(
         es_endpoint,
         api_key=es_api_key
     )
-    print(es_client.info())
+    print("elastic search client:\n", es_client.info())
 
-
-
-
-    es_index_name = "test-langchain-retriever"
+    
+    es_index_name = "langchain-retriever"
     text_field = "text"
     dense_vector_field = "fake_embedding"
     num_characters_field = "num_characters"
     texts = [
-        "foo",
-        "bar",
-        "world",
-        "hello world",
-        "hello",
-        "foo bar",
-        "bla bla foo",
+        "condotril",
+        "neurofil",
+        "duobiotic",
+        "bulas",
     ]
 
-    es_index_data(es_client, es_index_name, text_field, dense_vector_field, embed, texts, refresh=True)
 
+    es_index_names = es_client.cat.indices(format="json")  # Retorna em formato JSON
+    # for index in es_index_names:
+    #     print(index['index'])
 
-    # print("conexao com elasticsearch com sucesso!")
+    es_index_names = [index['index'] for index in es_index_names]
 
-    # initialize_retriever()
+    if es_index_name not in es_index_names:
+        es_index_data(
+                        es_client, 
+                        es_index_name, 
+                        text_field,
+                        dense_vector_field,
+                        embed,
+                        num_characters_field,
+                        texts,
+                        refresh=True
+                    )
 
-    text_field = "text"
 
     vector_retriever = ElasticsearchRetriever.from_es_params(
         index_name=es_index_name,
         body_func=vector_query,
         content_field=text_field,
-        # url=es_endpoint,
+        url=es_endpoint,
         api_key=es_api_key
     )
+    message = vector_retriever.invoke("condotril")
+    print("\n\nmessage:\n", message)
 
-    vector_retriever.invoke("Condotril")
 
-
-    # usar o retriever em chain
-    prompt = ChatPromptTemplate.from_template(
-        """Answer the question based only on the context provided.
-
-        Context: {context}
-
-        Question: {question}"""
+    
+    hybrid_retriever = ElasticsearchRetriever.from_es_params(
+        index_name=es_index_name,
+        body_func=hybrid_query,
+        content_field=text_field,
+        url=es_endpoint,
+        api_key=es_api_key
     )
+    message2 = hybrid_retriever.invoke("neurofil")
+    print("\n\nHIBRID message:\n", message2)
 
-    llm = ChatOpenAI(model="gpt-4o-mini") # podemos alterar este modelo
 
-    def format_docs(docs):
-        return "\n\n".join(doc.page_content for doc in docs)
+    # # usar o retriever em chain
+    # prompt = ChatPromptTemplate.from_template(
+    #     """Answer the question based only on the context provided.
 
-    chain = (
-        {"context": vector_retriever | format_docs, "question": RunnablePassthrough()}
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
+    #     Context: {context}
 
-    chain.invoke("Quais são os benefícios do Condotril?")
+    #     Question: {question}"""
+    # )
+
+    # llm = ChatOpenAI(model="gpt-4o-mini") # podemos alterar este modelo
+
+    # def format_docs(docs):
+    #     return "\n\n".join(doc.page_content for doc in docs)
+
+    # chain = (
+    #     {"context": vector_retriever | format_docs, "question": RunnablePassthrough()}
+    #     | prompt
+    #     | llm
+    #     | StrOutputParser()
+    # )
+
+    # chain.invoke("Quais são os benefícios do Condotril?")
 
 
 
