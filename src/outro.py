@@ -12,7 +12,9 @@ from langchain_pinecone import PineconeVectorStore
 from typing import Any, Dict, Iterable
 from elasticsearch import Elasticsearch
 from elasticsearch.helpers import bulk
+from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
+from langchain_elasticsearch import ElasticsearchRetriever
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -48,6 +50,7 @@ def split_documents():
         is_separator_regex=False,
     )
 
+    # documents = "\n\n".join(load_documents())
     documents = load_documents()
     print("Número de documentos: ", len(documents))
     docs = []
@@ -67,6 +70,15 @@ def split_documents():
     print("Documento 3\n", docs[2].page_content, "\n", "-"*80)
 
     return docs
+
+# def get_ids(docs):
+#     documents = [doc.page_content if doc.page_content is not None else "" for doc in docs]
+#     document_ids = [f"id{index}" for index, _ in enumerate(documents)]
+    
+#     # for doc_id in document_ids:
+#     #     print(doc_id)
+
+#     return document_ids, docs
 
 def setup_pinecone_environment():
     if not os.getenv("PINECONE_API_KEY"):
@@ -116,6 +128,13 @@ def create_index(pc, index_name):
     
     return index
 
+
+# results = vector_store.similarity_search(
+#     "Tell me something about Duobiotic",
+#     k=2,
+# )
+# for res in results:
+#     print(f"* {res.page_content} [{res.metadata}]")
 
 
 
@@ -209,6 +228,38 @@ def vector_query(search_query: str) -> Dict:
     }
 
 
+# def hybrid_query(search_query: str) -> Dict:
+#     dense_vector_field = "fake_embedding"
+#     text_field = "text"
+#     embeddings = OllamaEmbeddings(model="llama3.2:1b")
+#     vector = embeddings.embed_query(search_query)  # same embeddings as for indexing
+#     return {
+#         "retriever": {
+#             "rrf": {
+#                 "retrievers": [
+#                     {
+#                         "standard": {
+#                             "query": {
+#                                 "match": {
+#                                     text_field: search_query,
+#                                 }
+#                             }
+#                         }
+#                     },
+#                     {
+#                         "knn": {
+#                             "field": dense_vector_field,
+#                             "query_vector": vector,
+#                             "k": 5,
+#                             "num_candidates": 10,
+#                         }
+#                     },
+#                 ]
+#             }
+#         }
+#     }
+
+
 
 
 
@@ -242,39 +293,154 @@ def main():
     print("Documentos armazenados com sucesso!")
     print("chegou aqui\n\n")
     
-    question = vector_store.similarity_search(
+    # # Testes de retriever do pinecone
+    results = vector_store.similarity_search(
         "Tell me something about Duobiotic",
         k=2
     )
+    for res in results:
+        print(f"* {res.page_content} [{res.metadata}]")
+
+
+    # results2 = vector_store.similarity_search_with_score(
+    #     "Quais são os ingredientes do Neurofil?", 
+    #     k=1
+    # )
+    # for res, score in results2:
+    #     print(f"* [SIM={score:3f}] {res.page_content} [{res.metadata}]")
     
-    documents = split_documents()
 
-    text_list = [doc.text for doc in documents]  # Extract text from each document
-    context = "\n".join(text_list)  # Join the text list with newlines    
+    # retriever = vector_store.as_retriever(
+    #     search_type="similarity_score_threshold",
+    #     search_kwargs={"k": 2, "score_threshold": 0.0001},
+    # )
+    # retriever.invoke("Quais são os ingredientes do Neurofil?")
 
+    parser = StrOutputParser()
 
     template = """
     Answer the question based on the context below. If you can't 
-            answer the question, reply "I don't know". If the 
-            question has nothing to do with the context, 
-            answer the question normally.
+    answer the question, reply "I don't know".
 
-            Context: {context}
+    Context: {context}
 
-            Question: {question}
+    Question: {question}
     """
 
     prompt = ChatPromptTemplate.from_template(template)
-    prompt.format(context=context, question=question)
-    parser = StrOutputParser()
-    chain = prompt | embed | parser
-    response = str(chain.invoke({
-        "context": context,
-        "question": question
-    }).strip())
 
-    print("Contexto:", context) 
-    print("Resposta:", response)
+    chain = (
+    {"context": vector_store.as_retriever(), "question": RunnablePassthrough()}
+    | prompt
+    | embed
+    | parser)
+
+    chain.invoke("Tell me something about Duobiotic")
+    
+    
+    # # RETRIEVER
+
+    # # es_url = "http://localhost:9200"
+    # es_endpoint = "https://324ecfa0ea11408f9c1d397bb89dad15.us-east-1.aws.found.io:443" # Marta
+    # es_api_key = "MXExTDJwSUJpQ0tFUXJESU5HZTY6TWxWSXpsSHFReXFSS0ExczFZWm56Zw=="
+    # # es_client = Elasticsearch(hosts=[es_url]) # local
+    # es_client = Elasticsearch(
+    #     es_endpoint,
+    #     api_key=es_api_key
+    # )
+    # print("elastic search client:\n", es_client.info())
+
+    
+    # es_index_name = "langchain-retriever"
+    # text_field = "text"
+    # dense_vector_field = "fake_embedding"
+    # num_characters_field = "num_characters"
+    # texts = [
+    #     "condotril",
+    #     "neurofil",
+    #     "duobiotic",
+    #     "bulas",
+    # ]
+
+
+    # es_index_names = es_client.cat.indices(format="json")  # Retorna em formato JSON
+    # # for index in es_index_names:
+    # #     print(index['index'])
+
+    # es_index_names = [index['index'] for index in es_index_names]
+
+    # if es_index_name not in es_index_names:
+    #     es_index_data(
+    #                     es_client, 
+    #                     es_index_name, 
+    #                     text_field,
+    #                     dense_vector_field,
+    #                     embed,
+    #                     num_characters_field,
+    #                     texts,
+    #                     refresh=True
+    #                 )
+
+
+    # vector_retriever = ElasticsearchRetriever.from_es_params(
+    #     index_name=es_index_name,
+    #     body_func=vector_query,
+    #     content_field=text_field,
+    #     url=es_endpoint,
+    #     api_key=es_api_key
+    # )
+
+    # message = vector_retriever.invoke("condotril")
+
+    # # print("\n\nmessage:\n", message)
+
+    # # for doc in message:
+    # #     print(f"Texto: {doc.page_content}")
+    # #     print(f"ID: {doc.metadata['_id']}")
+    # #     print(f"Pontuação: {doc.metadata['_score']:.4f}")
+    # #     print("-" * 50)  # Linha separadora
+
+
+    
+    # # hybrid_retriever = ElasticsearchRetriever.from_es_params(
+    # #     index_name=es_index_name,
+    # #     body_func=hybrid_query,
+    # #     content_field=text_field,
+    # #     url=es_endpoint,
+    # #     api_key=es_api_key
+    # # )
+    # # message2 = hybrid_retriever.invoke("neurofil")
+    # # print("\n\nHIBRID message:\n", message2)
+
+    # def format_docs(docs):
+    #     return "\n\n".join(doc.page_content for doc in docs)
+
+    # # Retrieve documents for testing
+    # retrieved_docs = vector_store.similarity_search("Tell me something about Duobiotic", k=2)
+
+    # # Format the retrieved documents into a single string
+    # formatted_context = format_docs(retrieved_docs)
+
+    # # Use the formatted context in the prompt template
+    # prompt = ChatPromptTemplate.from_template(
+    #     """Answer the question based only on the context provided.
+
+    #     Context: {context}
+
+    #     Question: {question}"""
+    # )
+
+    # # Pass the formatted_context and question to the prompt
+    # formatted_prompt = prompt.invoke({"context": formatted_context, "question": "What are the organization's sales goals?"})
+
+    # prompt_text = formatted_prompt.to_string()
+    # # Embed the prompt text using the embedding model
+    # prompt_embedding = embed.embed_query(prompt_text)
+    # # Parse the embedding if necessary
+    # parsed_output = StrOutputParser().parse(prompt_embedding)
+    
+    # #print("answer:", parsed_output)
+
 
 
 
