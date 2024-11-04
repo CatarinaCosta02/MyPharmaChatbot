@@ -138,21 +138,21 @@ def create_index(pc, index_name):
 
 
 
-def initialize_retriever():
+# def initialize_retriever():
 
-    index_name = "test-langchain-retriever"
-    text_field = "text"
-    dense_vector_field = "fake_embedding"
-    num_characters_field = "num_characters"
-    texts = [
-        "foo",
-        "bar",
-        "world",
-        "hello world",
-        "hello",
-        "foo bar",
-        "bla bla foo",
-    ]
+#     index_name = "test-langchain-retriever"
+#     text_field = "text"
+#     dense_vector_field = "fake_embedding"
+#     num_characters_field = "num_characters"
+#     texts = [
+#         "foo",
+#         "bar",
+#         "world",
+#         "hello world",
+#         "hello",
+#         "foo bar",
+#         "bla bla foo",
+#     ]
 
 
 
