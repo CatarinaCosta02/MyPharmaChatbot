@@ -446,3 +446,92 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# def initialize_retriever():
+
+#     index_name = "test-langchain-retriever"
+#     text_field = "text"
+#     dense_vector_field = "fake_embedding"
+#     num_characters_field = "num_characters"
+#     texts = [
+#         "foo",
+#         "bar",
+#         "world",
+#         "hello world",
+#         "hello",
+#         "foo bar",
+#         "bla bla foo",
+#     ]
+
+
+
+
+
+# def es_create_index(
+#     es_client: Elasticsearch,
+#     index_name: str,
+#     text_field: str,
+#     dense_vector_field: str,
+#     num_characters_field: str,
+# ):
+#     es_client.indices.create(
+#         index=index_name,
+#         mappings={
+#             "properties": {
+#                 text_field: {"type": "text"},
+#                 dense_vector_field: {"type": "dense_vector"},
+#                 num_characters_field: {"type": "integer"},
+#             }
+#         },
+#     )
+
+
+# def es_index_data(
+#     es_client: Elasticsearch,
+#     index_name: str,
+#     text_field: str,
+#     dense_vector_field: str,
+#     embeddings: Embeddings,
+#     num_characters_field: str,
+#     texts: Iterable[str],
+#     refresh: bool = True,
+# ) -> None:
+#     es_create_index(
+#         es_client, index_name, text_field, dense_vector_field, num_characters_field
+#     )
+
+#     vectors = embeddings.embed_documents(list(texts))
+#     requests = [
+#         {
+#             "_op_type": "index",
+#             "_index": index_name,
+#             "_id": i,
+#             text_field: text,
+#             dense_vector_field: vector,
+#             num_characters_field: len(text),
+#         }
+#         for i, (text, vector) in enumerate(zip(texts, vectors))
+#     ]
+
+#     bulk(es_client, requests)
+
+#     if refresh:
+#         es_client.indices.refresh(index=index_name)
+
+#     print("Print importante:", len(requests))
+
+#     return len(requests)
+
+
+# def vector_query(search_query: str) -> Dict:
+#     dense_vector_field = "fake_embedding"
+#     embeddings = OllamaEmbeddings(model="llama3.2:1b")
+#     vector = embeddings.embed_query(search_query)  # same embeddings as for indexing
+#     return {
+#         "knn": {
+#             "field": dense_vector_field,
+#             "query_vector": vector,
+#             "k": 5,
+#             "num_candidates": 10,
+#         }
+#     }

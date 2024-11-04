@@ -73,9 +73,12 @@ def chatbot_first_message(vectorstore):
 
     docs = vectorstore.similarity_search(question, k=2)
 
+    # docs = [doc.page_content if doc.page_content is not None else "" for doc in documents]
+
     context = "\n".join([doc.page_content for doc in docs])
 
     llm = OllamaEmbeddings(model="llama3.2:1b")
+
 
     template = """
     Answer the question based on the context below. If you can't 
@@ -88,15 +91,17 @@ def chatbot_first_message(vectorstore):
             Question: {question}
     """
 
-    prompt = ChatPromptTemplate.from_template(template)
-    prompt.format(context=context, question=question)
+    template = ChatPromptTemplate.from_template(template)
+    template.format(context=context, question=question)
+    embedding_dict = prompt(text=template)
+    chain = parser.run(embedding_dict)
     parser = StrOutputParser()
 
-    chain = prompt | parser
+    chain = prompt | llm | parser
     response = str(chain.invoke({
         "context": context,
         "question": question
-    }).strip())
+    }).get('text', ''))
 
     print("Contexto:", context) 
     print("Resposta:", response)
@@ -152,7 +157,6 @@ def create_index(pc, index_name):
     return index
 
 
-# Retriever
 
 def main():
     
