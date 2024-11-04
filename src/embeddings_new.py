@@ -68,6 +68,41 @@ def split_documents():
 
     return docs
 
+def chatbot_first_message(vectorstore):
+    question = "Tell me something about Duobiotic"
+
+    docs = vectorstore.similarity_search(question, k=2)
+
+    context = "\n".join([doc.page_content for doc in docs])
+
+    llm = OllamaEmbeddings(model="llama3.2:1b")
+
+    template = """
+    Answer the question based on the context below. If you can't 
+            answer the question, reply "I don't know". If the 
+            question has nothing to do with the context, 
+            answer the question normally.
+
+            Context: {context}
+
+            Question: {question}
+    """
+
+    prompt = ChatPromptTemplate.from_template(template)
+    prompt.format(context=context, question=question)
+    parser = StrOutputParser()
+
+    chain = prompt | parser
+    response = str(chain.invoke({
+        "context": context,
+        "question": question
+    }).strip())
+
+    print("Contexto:", context) 
+    print("Resposta:", response)
+
+    return question, response
+
 def setup_pinecone_environment():
     if not os.getenv("PINECONE_API_KEY"):
         os.environ["PINECONE_API_KEY"] = getpass.getpass("Enter your Pinecone API key: ")
@@ -117,105 +152,12 @@ def create_index(pc, index_name):
     return index
 
 
-
-
-def initialize_retriever():
-
-    index_name = "test-langchain-retriever"
-    text_field = "text"
-    dense_vector_field = "fake_embedding"
-    num_characters_field = "num_characters"
-    texts = [
-        "foo",
-        "bar",
-        "world",
-        "hello world",
-        "hello",
-        "foo bar",
-        "bla bla foo",
-    ]
-
-
-
-
-
-def es_create_index(
-    es_client: Elasticsearch,
-    index_name: str,
-    text_field: str,
-    dense_vector_field: str,
-    num_characters_field: str,
-):
-    es_client.indices.create(
-        index=index_name,
-        mappings={
-            "properties": {
-                text_field: {"type": "text"},
-                dense_vector_field: {"type": "dense_vector"},
-                num_characters_field: {"type": "integer"},
-            }
-        },
-    )
-
-
-def es_index_data(
-    es_client: Elasticsearch,
-    index_name: str,
-    text_field: str,
-    dense_vector_field: str,
-    embeddings: Embeddings,
-    num_characters_field: str,
-    texts: Iterable[str],
-    refresh: bool = True,
-) -> None:
-    es_create_index(
-        es_client, index_name, text_field, dense_vector_field, num_characters_field
-    )
-
-    vectors = embeddings.embed_documents(list(texts))
-    requests = [
-        {
-            "_op_type": "index",
-            "_index": index_name,
-            "_id": i,
-            text_field: text,
-            dense_vector_field: vector,
-            num_characters_field: len(text),
-        }
-        for i, (text, vector) in enumerate(zip(texts, vectors))
-    ]
-
-    bulk(es_client, requests)
-
-    if refresh:
-        es_client.indices.refresh(index=index_name)
-
-    print("Print importante:", len(requests))
-
-    return len(requests)
-
-
-def vector_query(search_query: str) -> Dict:
-    dense_vector_field = "fake_embedding"
-    embeddings = OllamaEmbeddings(model="llama3.2:1b")
-    vector = embeddings.embed_query(search_query)  # same embeddings as for indexing
-    return {
-        "knn": {
-            "field": dense_vector_field,
-            "query_vector": vector,
-            "k": 5,
-            "num_candidates": 10,
-        }
-    }
-
-
-
-
+# Retriever
 
 def main():
     
     documents = split_documents()
-    embed = OllamaEmbeddings(model="llama3.2:1b")
+    model = OllamaEmbeddings(model="llama3.2:1b")
 
     pinecone_api_key = setup_pinecone_environment()
     if not pinecone_api_key:
@@ -231,7 +173,7 @@ def main():
     uuids = [str(uuid.uuid4()) for _ in range(len(documents))]
 
     if index:
-        vector_store = PineconeVectorStore(index=index, embedding=embed)
+        vector_store = PineconeVectorStore(index=index, embedding=model, text_key="text")
         print("Índice criado com sucesso!")
     else:
         print("Falha na criação do índice.")
@@ -241,40 +183,11 @@ def main():
     # vector_store._index.delete(delete_all=True) # apagar todos os documentos da base de dados
     print("Documentos armazenados com sucesso!")
     print("chegou aqui\n\n")
-    
-    question = vector_store.similarity_search(
-        "Tell me something about Duobiotic",
-        k=2
-    )
-    
-    documents = split_documents()
 
-    text_list = [doc.text for doc in documents]  # Extract text from each document
-    context = "\n".join(text_list)  # Join the text list with newlines    
-
-
-    template = """
-    Answer the question based on the context below. If you can't 
-            answer the question, reply "I don't know". If the 
-            question has nothing to do with the context, 
-            answer the question normally.
-
-            Context: {context}
-
-            Question: {question}
-    """
-
-    prompt = ChatPromptTemplate.from_template(template)
-    prompt.format(context=context, question=question)
-    parser = StrOutputParser()
-    chain = prompt | embed | parser
-    response = str(chain.invoke({
-        "context": context,
-        "question": question
-    }).strip())
-
-    print("Contexto:", context) 
+    question, response = chatbot_first_message(vector_store)
+    print("Pergunta:", question)
     print("Resposta:", response)
+    
 
 
 
