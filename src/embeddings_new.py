@@ -60,7 +60,7 @@ def split_documents():
     print("Número de documentos: ", len(documents))
     docs = []
     for content in documents.values():
-        docs.extend(text_splitter.create_documents([content]))  # 
+        docs.extend(text_splitter.create_documents([content]))
 
     for _, (product, content) in enumerate(documents.items()):
         num_characters = len(content)
@@ -101,6 +101,24 @@ def chatbot_first_message(vector_store):
     # )
 
 
+    vector_count = vector_store._index.describe_index_stats().get("total_vector_count", 0)
+    print(f"Total de documentos no vector_store: {vector_count}") # tem que ser 3
+
+
+    results1 = vector_store.similarity_search(query="thud",k=1)
+    print("results1: ", results1)
+    for doc in results1:
+        print(f"* {doc.page_content} [{doc.metadata}]")
+    
+        
+    results2 = vector_store.similarity_search_with_score(query="qux",k=1) # É AQUI QUE DÁ MALLLLL :(
+    print("results: ", results2)
+    for doc, score in results2:
+        print(f"* [SIM={score:3f}] {doc.page_content} [{doc.metadata}]")
+
+
+
+
     llm = OllamaLLM(model="llama3.2:1b")
 
     # llm = ChatOpenAI(
@@ -109,12 +127,33 @@ def chatbot_first_message(vector_store):
     #     temperature=0.0  
     # )
 
+    print("llm: ", llm)
+
+    retriever = vector_store.as_retriever(
+        search_type="similarity_score_threshold",
+        search_kwargs={"k": 3, "score_threshold": 0.01},
+    )
+    print(retriever.invoke(question))
+
+    print("*"*100)
+    
+
+    
     qa = RetrievalQA.from_chain_type(  
         llm=llm,
         chain_type="stuff",  
-        retriever=vector_store.as_retriever()  
-    )  
-    print(qa.invoke(question).result)
+        retriever=retriever
+    )
+   
+    print("Retriever:", qa.retriever)
+   
+    response = qa.invoke(question)
+    print("Response:", response)
+
+    retrieved_docs = qa.retriever.get_relevant_documents(question)
+    for doc in retrieved_docs:
+        print("Document:", doc)
+
 
     print("---------\nOpção 2:")
 
@@ -123,9 +162,15 @@ def chatbot_first_message(vector_store):
         chain_type="stuff",  
         retriever=vector_store.as_retriever()  
     )  
-    print(qa_with_sources.invoke(question).answer)
+    
+    response_with_sources = qa_with_sources.invoke(question)
+    print("Response with sources:", response_with_sources)
+   
+    answer = response_with_sources.get("result") or response_with_sources.get("answer") or "No answer found"
+    print("Answer:", answer)
+    # print(qa_with_sources.invoke(question).answer)
 
-
+    return answer
 
     # # docs = load_documents()
     # docs = retriever.invoke(question)
@@ -220,11 +265,37 @@ def create_index(pc, index_name):
             logger.error(f"Failed to create index: {str(e)}")
             return None
     
-    print(pc.Index(index_name).describe_index_stats())
+    # print(pc.Index(index_name).describe_index_stats())
 
     index = pc.Index(index_name)
     
     return index
+
+
+def show_all_metadata(vector_store):
+    # Recupera todos os IDs dos documentos no Pinecone (não os conteúdos, apenas os metadados)
+    vector_count = vector_store._index.describe_index_stats().get("total_vector_count", 0)
+
+    # Se o índice tiver documentos, proceder para buscar os metadados
+    if vector_count > 0:
+        # Configura o número de documentos a ser recuperado (top_k). Ajuste conforme necessário
+        top_k = vector_count  # Aqui estamos pegando todos os documentos. Pode ser ajustado.
+
+        # Executa uma consulta que não retorna valores (conteúdo), mas apenas metadados
+        results = vector_store._index.query(
+            vector=[0] * 1536,  # Uma consulta de vetor genérica (tamanho 1536 para o modelo Llama)
+            top_k=top_k,
+            include_values=False,  # Não queremos os vetores
+            include_metadata=True  # Inclui os metadados
+        )
+
+        # Exibe os metadados dos documentos encontrados
+        for match in results["matches"]:
+            print("Document ID:", match["id"])
+            print("Metadados:", match["metadata"])
+            print("-----")
+    else:
+        print("O índice não contém documentos.")
 
 
 
@@ -242,25 +313,30 @@ def main():
     index_name = "lala"
     index = create_index(pc, index_name)
 
-    docs = [doc.page_content if doc.page_content is not None else "" for doc in documents]
+    # documents = [{"text": doc.page_content} for doc in documents if doc.page_content]
     # para os ids
     uuids = [str(uuid.uuid4()) for _ in range(len(documents))]
 
     vector_store = PineconeVectorStore(index=index, embedding=model, text_key="text")
+    # vector_store = Pinecone(
+    #     index, model.embed_query, namespace=namespace
+    # )
 
-    # if index:
-    #     vector_store = PineconeVectorStore(index=index, embedding=model, text_key="text")
-    #     print("Índice criado com sucesso!")
-    # else:
-    #     print("Falha na criação do índice.")
 
     index_info = index.describe_index_stats()
     vector_count = index_info["total_vector_count"]
     if vector_count == 0:
         vector_store.add_documents(documents=documents, ids=uuids)
-    
+
+    print(index.describe_index_stats())
+
+
     # apagar os documentos (caso necessário)
     # vector_store._index.delete(delete_all=True)
+    
+    # Chama a função para exibir os metadados
+    show_all_metadata(vector_store)
+
     
     # print("Documentos armazenados com sucesso!")
     # print("chegou aqui\n\n")
@@ -294,7 +370,9 @@ def main():
 
     # Realizar a pergunta inicial
     # question, response = chatbot_first_message(vector_store)
+    
     chatbot_first_message(vector_store)
+
     # print("\nPergunta:", question)
     # print("\nResposta:", response)
     
