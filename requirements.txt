@@ -1,2 +1,14 @@
 pdf2image
 pytesseract
+pymupdf4llm
+langchain-ollama
+langchain-text-splitters
+langchain-community
+faiss-cpu
+langgraph
+fuzzywuzzy
+autocorrect
+spellchecker
+pyspellchecker
+jupyterlab
+langsmith
