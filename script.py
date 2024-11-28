@@ -34,7 +34,7 @@ def run_notebook(question):
 
     # Converter o notebook para cns ler
     notebook = nbformat.from_dict(notebook)
-    client = NotebookClient(notebook, kernel_name="python3")
+    client = NotebookClient(notebook, kernel_name="python")
     client.execute()
 
     # Extrair a resposta da ultima celula
