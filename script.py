@@ -1,14 +1,20 @@
 import sys
 import nbformat
 from nbclient import NotebookClient
+import asyncio
+import sys
+import io
+
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
+if hasattr(asyncio, 'WindowsSelectorEventLoopPolicy'):
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 def run_notebook(question):
-    notebook_path = "chatbot_example/chatbot_test.ipynb"
+    notebook_path = "chatbot_example/chatbot.ipynb"
     with open(notebook_path, "r", encoding="utf-8") as f:
         notebook = nbformat.read(f, as_version=4)
-
-    print(f"\nquestion: {question}\n")
 
     notebook.cells.insert(0, {
         "cell_type": "code",
@@ -46,4 +52,4 @@ def run_notebook(question):
 
 if __name__ == "__main__":
     question = sys.argv[1] if len(sys.argv) > 1 else "Nenhuma pergunta fornecida."
-    print(run_notebook(question))
+    print(str(run_notebook(question)))

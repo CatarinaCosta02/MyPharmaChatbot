@@ -1,6 +1,9 @@
 pdf2image
 pytesseract
 pymupdf4llm
+langchain
+langchain-openai
+openai
 langchain-ollama
 langchain-text-splitters
 langchain-community
