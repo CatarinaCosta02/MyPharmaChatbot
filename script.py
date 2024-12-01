@@ -10,7 +10,6 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 if hasattr(asyncio, 'WindowsSelectorEventLoopPolicy'):
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-
 def run_notebook(question):
     notebook_path = "chatbot_example/chatbot.ipynb"
     with open(notebook_path, "r", encoding="utf-8") as f:

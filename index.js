@@ -2,6 +2,8 @@ import express from "express";
 import bodyParser from "body-parser";
 import cors from "cors";
 import { exec } from "child_process"; 
+import { marked } from "marked";
+
 
 const app = express();
 app.use(cors());
@@ -22,7 +24,11 @@ app.post("/", (req, res) => {
             return res.status(500).json({ response: "Erro ao processar a pergunta." });
         }
 
-        res.json({ response: stdout.trim() });
+        // Converte a resposta de Markdown para HTML
+        const htmlResponse = marked(stdout.trim());
+
+        // Envia a resposta convertida como HTML para o frontend
+        res.json({ response: htmlResponse });
     });
 });
 
