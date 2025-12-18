@@ -20,7 +20,7 @@ The primary **goal** is to provide detailed information about the company’s fo
 - **Framework:** LangChain
 - **Environment:** Jupyter Notebook.
 
-## 📂 Structure
+## Structure
 
 | Folder | Description |
 | :--- | :--- |
@@ -28,3 +28,10 @@ The primary **goal** is to provide detailed information about the company’s fo
 | `chatbot` | Chatbot Jupyter notebooks and food supplements documentation  |
 | `chroma` | Experimental environment files for ChromaDB integration|
 | `other` | Technical scripts metadata extraction and Node.js API layer for front-end system integration.|
+
+## Chatbot Team Members
+Catarina Costa, pg52676
+
+Inês D. Ferreira, pg53870
+
+Marta Aguiar, pg52694
