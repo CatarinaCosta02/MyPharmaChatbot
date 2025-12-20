@@ -21,7 +21,7 @@ The primary **goal** is to provide detailed information about the company’s fo
 ## Chatbot Workflow
 
 <p align="center">
-  <img src="https://github.com/CatarinaCosta02/MyPharmaChatbot/blob/main/Documents/ChatbotWorkflow.png" width="600">
+  <img src="https://github.com/CatarinaCosta02/MyPharmaChatbot/blob/main/Documents/ChatbotWorkflow.png" width="300">
 </p>
 
 ## Tech Stack
