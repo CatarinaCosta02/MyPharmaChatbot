@@ -10,7 +10,19 @@ The primary **goal** is to provide detailed information about the company’s fo
 - RAG-based system;
 - Language normalization pipeline that removes special characters and accents to improve Portuguese spell checking.
 - Spell Checking (```SpellChecker``` tool)
-- Similarity matching (```fuzzywuzzy```) 
+- Similarity matching (```fuzzywuzzy```)
+
+## Architecture 
+
+<p align="center">
+  <img src="https://github.com/CatarinaCosta02/MyPharmaChatbot/blob/main/Documents/Project%20Architecture.png" width="600">
+</p>
+
+## Chatbot Workflow
+
+<p align="center">
+  <img src="https://github.com/CatarinaCosta02/MyPharmaChatbot/blob/main/Documents/ChatbotWorkflow.png" width="600">
+</p>
 
 ## Tech Stack
 
